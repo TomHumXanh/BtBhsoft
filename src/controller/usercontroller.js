@@ -1,14 +1,14 @@
 import mongoose from "mongoose";
-import User from "../models/usermodles";
+import User from "../models/usermodles.js";
 import bcrypt from "bcrypt";
-import signToken from "../ultils/token";
+import signToken from "../ultils/token.js";
 
 
-// Xác thực người dùng đăng ký
+// Verify register users
 export const createUser = async function(req, res) {
-    // Yêu cầu nhập dữ liệu từ người dùng
+    // Request input from the user
     const {username, password, email, phone} = await req.body;
-    // Kiểm tra tên đăng nhập và email
+    // Check username and email
     const userExisted = await User.findOne({
         username,
     });
@@ -18,12 +18,12 @@ export const createUser = async function(req, res) {
     });
 
     console.log(userExisted, emailExisted);
-    // Kiểm tra và tạo tài khoản 
+    // Check and create account 
     if (!userExisted && !emailExisted) {
-        // Mã hóa mật khẩu 
+        // Encrypt password
         const saltRounds = 10;
         const hash = bcrypt.hashSync(password, saltRounds);
-        // Tạo người dùng mới 
+        // Create new user
         const createRequire = {
 
             _id: mongoose.Types.ObjectId(),
@@ -32,8 +32,8 @@ export const createUser = async function(req, res) {
             email,
             phone,
             created: Date.now(),
-        },
-        // Thông báo khi tạo thành công
+        };
+        // Notification when successful creation
         const newUser = await User.create(createRequire);
         res.status(201).json({
             status: "Tạo tài khoản thành công",
@@ -41,12 +41,67 @@ export const createUser = async function(req, res) {
                 user: newUser,
             }
         });
-        // Thông báo khi tạo tài khoản thất bại
+        // Notice when creation failed
     }else {
         res.status(500).json({
             status: "Tài khoản hoặc email đã được sử dụng",
         })
     };
+};
+// Login handling
+export const login = async function(req, res) {
+    const username = await req.body.username;
+    const password = await req.body.password;
+    const email = await req.body.email;
+    const result = !!username ? { username: username } : { email: email };
+    
+    try {
+
+        // Check 
+        const user = await User.findOne(result);
+        // Report an error if doesn't match
+        if (!user) {
+            return res.status(404).json({
+              statusCode: 404,
+              message: "Tài khoản hoặc mật khẩu không chính xác",
+              data: {},
+            });
+        
+        };
+
+        // Result 
+        if (!bcrypt.compareSync(password, user.password)) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: "Mật khẩu không chính xác"
+            });
+        };
+    
+        const sendToken = singToken({
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            isActive: user.isActive,
+
+        });
+      
+        res.status(200).json({
+            statusCode: 200,
+            message: "Đăng nhập thành công",
+            data: {
+                token: sendToken
+            }
+        });
+        
+    } catch (err) {
+        res.status(404).json({
+            statusCode: 404,
+            message: err.message,
+            data: {},
+          });
+    };
+
+
 };
 
 
